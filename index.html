@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Chart Analyzer</title>
+    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/10503/10503979.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -84,6 +85,14 @@
             <!-- Image Upload Section -->
             <div class="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4">Upload Chart Screenshot</h2>
+                
+                <div class="mb-4">
+                    <label for="entryPrice" class="block text-gray-700 text-sm font-bold mb-2">
+                        Entry Price (Optional):
+                    </label>
+                    <input type="number" id="entryPrice" placeholder="e.g., 150.75" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-indigo-500">
+                </div>
+
                 <div class="file-input-wrapper mb-4">
                     <input type="file" id="chartUpload" accept="image/png, image/jpeg, image/webp">
                     <label for="chartUpload" class="file-input-button">
@@ -108,7 +117,7 @@
             <div class="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4">Analysis Result</h2>
                 <div id="loadingIndicator" class="loader my-8"></div>
-                <div id="analysisResult" class="min-h-[200px] bg-gray-50 p-4 rounded-md border border-gray-200 text-gray-700 leading-relaxed overflow-y-auto max-h-[400px]">
+                <div id="analysisResult" class="bg-gray-50 p-4 rounded-md border border-gray-200 text-gray-700 leading-relaxed">
                     <p class="text-gray-500">Upload a stock chart and click "Analyze Chart" to get insights from an AI swing trader.</p>
                 </div>
                  <!-- Custom Message Box -->
@@ -134,6 +143,7 @@
         const messageBoxTitle = document.getElementById('messageBoxTitle');
         const messageBoxContent = document.getElementById('messageBoxContent');
         const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
+        const entryPriceInput = document.getElementById('entryPrice');
 
         let base64Image = ''; // To store the base64 string of the uploaded image
 
@@ -148,6 +158,72 @@
         messageBoxCloseBtn.addEventListener('click', () => {
             messageBox.classList.add('hidden');
         });
+
+        // Function to format the raw text response into HTML
+        function formatAnalysisResult(rawText) {
+            let htmlContent = '';
+            
+            const lines = rawText.split('\n');
+            let inUnorderedList = false;
+            let inOrderedList = false;
+
+            lines.forEach(line => {
+                let trimmedLine = line.trim();
+
+                // Convert bold markdown to HTML strong tags
+                trimmedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                // Convert italics markdown to HTML em tags
+                trimmedLine = trimmedLine.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                trimmedLine = trimmedLine.replace(/_(.*?)_/g, '<em>$1</em>');
+
+
+                if (trimmedLine.startsWith('### ')) {
+                    // Close any open lists before a heading
+                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
+                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
+                    htmlContent += `<h3 class="text-xl font-semibold mt-4 mb-2 text-indigo-800">${trimmedLine.substring(4).trim()}</h3>`;
+                } else if (trimmedLine.match(/^\d+\.\s/)) { // Ordered list item (e.g., "1. ")
+                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
+                    if (!inOrderedList) { htmlContent += '<ol class="list-decimal list-inside ml-4 mb-2">'; inOrderedList = true; }
+                    htmlContent += `<li class="mb-1">${trimmedLine}</li>`;
+                } else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ')) { // Unordered list item
+                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
+                    if (!inUnorderedList) { htmlContent += '<ul class="list-disc list-inside ml-4 mb-2">'; inUnorderedList = true; }
+                    htmlContent += `<li class="mb-1">${trimmedLine.substring(2).trim()}</li>`;
+                } else if (trimmedLine === '') {
+                    // Close lists if there's an empty line after them
+                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
+                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
+                    htmlContent += '<p class="mb-2">&nbsp;</p>'; // Add a non-breaking space for line breaks
+                } else {
+                    // Close any open lists before a regular paragraph
+                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
+                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
+                    htmlContent += `<p class="mb-2">${trimmedLine}</p>`;
+                }
+            });
+
+            // Close any remaining open lists at the end
+            if (inUnorderedList) { htmlContent += '</ul>'; }
+            if (inOrderedList) { htmlContent += '</ol>'; }
+
+            // Add emojis based on keywords (simple example)
+            htmlContent = htmlContent.replace(/uptrend/g, 'uptrend 📈');
+            htmlContent = htmlContent.replace(/downtrend/g, 'downtrend 📉');
+            htmlContent = htmlContent.replace(/strong/g, 'strong 💪'); // Applies to "momentum is strong" or other strong instances
+            htmlContent = htmlContent.replace(/Golden Cross/g, 'Golden Cross ✨');
+            htmlContent = htmlContent.replace(/decision/g, 'decision 💡');
+            htmlContent = htmlContent.replace(/support/g, 'support 🛡️');
+            htmlContent = htmlContent.replace(/resistance/g, 'resistance 🧱');
+            htmlContent = htmlContent.replace(/buy/g, 'buy 🟢');
+            htmlContent = htmlContent.replace(/sell/g, 'sell 🔴');
+            htmlContent = htmlContent.replace(/Profit/g, 'Profit 💰');
+            htmlContent = htmlContent.replace(/Loss/g, 'Loss 💸');
+            htmlContent = htmlContent.replace(/risk/g, 'risk ⚠️');
+
+
+            return htmlContent;
+        }
 
         chartUpload.addEventListener('change', function(event) {
             const file = event.target.files[0];
@@ -186,8 +262,15 @@
             analysisResult.innerHTML = ''; // Clear previous results
             loadingIndicator.style.display = 'block'; // Show loader
 
-            const prompt = `Act as a highly skilled swing trader, What this day chart mean to you? What you would do?
-            Where MA 10 is Purple, MA 20 is green, MA 50 is black, MA 200 is yellow. It should be short on point helping a newbie to make decision.`;
+            const entryPrice = entryPriceInput.value;
+            let prompt = `একজন অত্যন্ত দক্ষ সুইং ট্রেডার হিসেবে, এই দিনের চার্টটি আপনার কাছে কী অর্থ বহন করে এবং আপনি কী পদক্ষেপ নেবেন তা বিশ্লেষণ করুন। `;
+
+            if (entryPrice && !isNaN(parseFloat(entryPrice))) {
+                prompt += `যদি ট্রেডারটি **${parseFloat(entryPrice).toFixed(2)}** এন্ট্রি প্রাইসে ট্রেডে থেকে থাকেন, তাহলে তার কী করা উচিত সেই বিষয়েও সুনির্দিষ্ট পরামর্শ দিন, যার মধ্যে Take Profit এবং Stop Loss লেভেল অন্তর্ভুক্ত থাকবে। `;
+            }
+
+            prompt += `আপনার প্রতিক্রিয়া স্পষ্টভাবে মার্কডাউন ব্যবহার করে বাংলায় লিখুন (যেমন: হেডিং, বুলেট পয়েন্ট, বোল্ড টেক্সট)। তবে 'MA', 'RSI', 'Support', 'Resistance', 'Candlestick', 'Volume', 'Breakout', 'Retest', 'Golden Cross', 'Death Cross', 'Uptrend', 'Downtrend', 'Consolidation', 'Stop Loss', 'Take Profit', 'Entry', 'Exit' এর মতো ট্রেডিং শব্দগুলো ইংরেজিতেই রাখুন। MA 10 বেগুনি, MA 20 সবুজ, MA 50 কালো, MA 200 হলুদ। এটি একজন নতুন ট্রেডারকে সিদ্ধান্ত নিতে সাহায্য করার জন্য সংক্ষিপ্ত এবং সুস্পষ্ট হওয়া উচিত।`;
+
 
             let chatHistory = [];
             chatHistory.push({
@@ -206,7 +289,15 @@
                 contents: chatHistory
             };
 
-            const apiKey = "AIzaSyChsJtQKCt8pJUCTjIe_-e0t777uWzXY7A"; // Canvas will automatically provide it in runtime
+            // IMPORTANT: For production deployments on GitHub Pages,
+            // NEVER expose your API key directly in client-side code.
+            // Use a secure backend to proxy your API calls.
+            // For local testing/personal use, you can replace "YOUR_GEMINI_API_KEY"
+            // with your actual Gemini API Key from Google AI Studio.
+            const apiKey = "AIzaSyChsJtQKCt8pJUCTjIe_-e0t777uWzXY7A"; // <<-- REPLACE THIS WITH YOUR ACTUAL API KEY FOR TESTING
+            // For Canvas environment, this variable is automatically populated.
+            // If running on GitHub Pages, you MUST provide your key here or use a backend.
+
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
             let retryCount = 0;
@@ -240,9 +331,8 @@
                         result.candidates[0].content && result.candidates[0].content.parts &&
                         result.candidates[0].content.parts.length > 0) {
                         let rawText = result.candidates[0].content.parts[0].text;
-                        // Replace newlines with <br> for proper rendering of line breaks
-                        let formattedText = rawText.replace(/\n/g, '<br>');
-                        analysisResult.innerHTML = `<div class="text-gray-700">${formattedText}</div>`;
+                        // Format the raw text with HTML tags and emojis
+                        analysisResult.innerHTML = formatAnalysisResult(rawText);
                     } else {
                         analysisResult.innerHTML = `<p class="text-red-600">Could not get a valid analysis from the AI. Please try again or with a different image.</p>`;
                         console.error("Unexpected API response structure:", result);
