@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Chart Analyzer</title>
-    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/10503/10503979.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -82,9 +81,9 @@
         <h1 class="text-4xl font-bold text-center text-indigo-700 mb-6">Stock Chart Analyzer</h1>
 
         <div class="flex flex-col gap-8">
-            <!-- Image Upload Section -->
+            <!-- Image Input Section -->
             <div class="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Upload Chart Screenshot</h2>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Provide Chart Image</h2>
                 
                 <div class="mb-4">
                     <label for="entryPrice" class="block text-gray-700 text-sm font-bold mb-2">
@@ -93,15 +92,17 @@
                     <input type="number" id="entryPrice" placeholder="e.g., 150.75" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-indigo-500">
                 </div>
 
-                <div class="file-input-wrapper mb-4">
-                    <input type="file" id="chartUpload" accept="image/png, image/jpeg, image/webp">
-                    <label for="chartUpload" class="file-input-button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8" />
-                        </svg>
-                        <span id="uploadText">Choose Image</span>
+                <div class="mb-4">
+                    <label for="imageUrl" class="block text-gray-700 text-sm font-bold mb-2">
+                        Image URL:
                     </label>
+                    <input type="text" id="imageUrl" placeholder="e.g., https://s3.tradingview.com/snapshots/k/kViaEhps.png" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-indigo-500">
                 </div>
+
+                <button id="loadImageBtn" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 mb-4">
+                    Load Image from URL
+                </button>
+                
                 <div class="mb-4 text-sm text-gray-500">
                     Supported formats: PNG, JPEG, WEBP. Max size: 7MB.
                 </div>
@@ -118,7 +119,7 @@
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4">Analysis Result</h2>
                 <div id="loadingIndicator" class="loader my-8"></div>
                 <div id="analysisResult" class="bg-gray-50 p-4 rounded-md border border-gray-200 text-gray-700 leading-relaxed">
-                    <p class="text-gray-500">Upload a stock chart and click "Analyze Chart" to get insights from an AI swing trader.</p>
+                    <p class="text-gray-500">Upload a stock chart or provide its URL and click "Analyze Chart" to get insights from an AI swing trader.</p>
                 </div>
                  <!-- Custom Message Box -->
                 <div id="messageBox" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
@@ -133,9 +134,9 @@
     </div>
 
     <script>
-        const chartUpload = document.getElementById('chartUpload');
+        const imageUrlInput = document.getElementById('imageUrl');
+        const loadImageBtn = document.getElementById('loadImageBtn');
         const chartPreview = document.getElementById('chartPreview');
-        const uploadText = document.getElementById('uploadText');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const analysisResult = document.getElementById('analysisResult');
         const loadingIndicator = document.getElementById('loadingIndicator');
@@ -146,6 +147,7 @@
         const entryPriceInput = document.getElementById('entryPrice');
 
         let base64Image = ''; // To store the base64 string of the uploaded image
+        let imageMimeType = ''; // To store the MIME type of the loaded image
 
         // Function to show custom message box
         function showMessageBox(title, message) {
@@ -225,37 +227,60 @@
             return htmlContent;
         }
 
-        chartUpload.addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file) {
+        // Function to load image from URL and convert to Base64
+        loadImageBtn.addEventListener('click', async () => {
+            const imageUrl = imageUrlInput.value.trim();
+            if (!imageUrl) {
+                showMessageBox('No URL Provided', 'Please enter an image URL.');
+                return;
+            }
+
+            // Clear previous preview and base64 data
+            chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Loading...";
+            base64Image = '';
+            imageMimeType = '';
+            
+            try {
+                const response = await fetch(imageUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to load image from URL: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                imageMimeType = blob.type; // Get actual MIME type
+
+                // Check if the MIME type is a supported image format
+                if (!['image/png', 'image/jpeg', 'image/webp'].includes(imageMimeType)) {
+                    showMessageBox('Unsupported Image Type', `The URL provided is not a supported image type (${imageMimeType}). Please use PNG, JPEG, or WEBP.`);
+                    chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Error+Loading";
+                    return;
+                }
+
                 // Check file size (max 7MB for Gemini API)
-                if (file.size > 7 * 1024 * 1024) {
-                    showMessageBox('File Too Large', 'Please upload an image smaller than 7MB.');
-                    chartUpload.value = ''; // Clear the input
-                    chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Chart+Preview";
-                    uploadText.textContent = "Choose Image";
-                    base64Image = '';
+                if (blob.size > 7 * 1024 * 1024) {
+                    showMessageBox('Image Too Large', 'The image from the URL is larger than 7MB. Please use a smaller image.');
+                    chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Too+Large";
                     return;
                 }
 
                 const reader = new FileReader();
-                reader.onload = function(e) {
-                    chartPreview.src = e.target.result;
-                    // Extract base64 part for the API call
-                    base64Image = e.target.result.split(',')[1];
+                reader.onloadend = function() {
+                    chartPreview.src = URL.createObjectURL(blob); // Use blob URL for preview for better performance
+                    base64Image = reader.result.split(',')[1]; // Get only the base64 part
                 };
-                reader.readAsDataURL(file);
-                uploadText.textContent = file.name;
-            } else {
-                chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Chart+Preview";
-                uploadText.textContent = "Choose Image";
-                base64Image = '';
+                reader.readAsDataURL(blob);
+
+            } catch (error) {
+                showMessageBox('Image Load Error', `Could not load image: ${error.message}. Please check the URL.`);
+                console.error("Image loading error:", error);
+                chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Error+Loading";
             }
         });
 
+
         analyzeBtn.addEventListener('click', async () => {
             if (!base64Image) {
-                showMessageBox('No Image Uploaded', 'Please upload a stock chart screenshot before analyzing.');
+                showMessageBox('No Image Loaded', 'Please load a stock chart image from a URL before analyzing.');
                 return;
             }
 
@@ -279,7 +304,7 @@
                     text: prompt
                 }, {
                     inlineData: {
-                        mimeType: "image/png", // Assuming PNG, but can be adjusted based on `file.type`
+                        mimeType: imageMimeType || "image/png", // Use detected MIME type, fallback to png
                         data: base64Image
                     }
                 }]
@@ -334,12 +359,12 @@
                         // Format the raw text with HTML tags and emojis
                         analysisResult.innerHTML = formatAnalysisResult(rawText);
                     } else {
-                        analysisResult.innerHTML = `<p class="text-red-600">Could not get a valid analysis from the AI. Please try again or with a different image.</p>`;
+                        analysisResult.innerHTML = `<p class="text-red-600">AI থেকে কোনো সঠিক বিশ্লেষণ পাওয়া যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা অন্য একটি ছবি ব্যবহার করুন।</p>`;
                         console.error("Unexpected API response structure:", result);
                     }
                     break; // Exit loop on success
                 } catch (error) {
-                    analysisResult.innerHTML = `<p class="text-red-600">Error analyzing chart: ${error.message}</p>`;
+                    analysisResult.innerHTML = `<p class="text-red-600">চার্ট বিশ্লেষণ করতে ত্রুটি: ${error.message}</p>`;
                     console.error("Error during API call:", error);
                     break; // Exit loop on unrecoverable error
                 } finally {
@@ -348,7 +373,7 @@
             }
 
             if (retryCount === maxRetries) {
-                analysisResult.innerHTML = `<p class="text-red-600">Failed to analyze chart after multiple retries. Please check your network connection or try again later.</p>`;
+                analysisResult.innerHTML = `<p class="text-red-600">কয়েকবার চেষ্টার পরও চার্ট বিশ্লেষণ করা সম্ভব হয়নি। অনুগ্রহ করে আপনার নেটওয়ার্ক সংযোগ পরীক্ষা করুন অথবা পরে আবার চেষ্টা করুন।</p>`;
             }
         });
         console.log("Stock Chart Analyzer script loaded successfully.");
