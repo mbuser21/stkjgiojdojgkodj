@@ -349,7 +349,7 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
                 ctx.drawImage(img, 0, 0);
 
                 const convertedBlob = await new Promise(resolve => {
-                    canvas.toBlob(resolve, 'image/webp', 0.92);
+                    canvas.toBlob(resolve, 'image/webp', 0.60);
                 });
 
                 if (!convertedBlob) {
@@ -487,3 +487,4 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
 </script>
 </body>
 </html>
+
