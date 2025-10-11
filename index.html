@@ -60,15 +60,15 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 18m-4-10h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
             </div>
-            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">WebP Converter</h1>
-            <p class="text-gray-500">Transform your images to WebP format instantly with AI-powered SEO filenames.</p>
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">WebP Converter (Batch Ready)</h1>
+            <p class="text-gray-500">Transform multiple images to WebP format instantly with AI-powered SEO filenames.</p>
         </div>
 
         <!-- Conversion Area / Drop Zone -->
         <div id="drop-zone" class="drop-zone p-8 rounded-xl bg-white shadow-lg flex flex-col items-center justify-center transition-shadow">
 
-            <!-- Hidden file input for selection -->
-            <input type="file" id="file-input" accept="image/*" class="hidden">
+            <!-- Hidden file input for selection - ADDED 'multiple' -->
+            <input type="file" id="file-input" accept="image/*" class="hidden" multiple>
 
             <!-- Initial State -->
             <div id="initial-state" class="w-full">
@@ -78,11 +78,11 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                 </div>
-                <p class="text-lg font-semibold text-gray-700 mb-2">Drop your image here</p>
-                <p class="text-gray-500 mb-6">or click to browse from your device</p>
+                <p class="text-lg font-semibold text-gray-700 mb-2">Drop your images here</p>
+                <p class="text-gray-500 mb-6">or click to browse for a batch of files</p>
 
                 <button id="select-image-btn" class="purple-gradient-btn text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-300">
-                    Select Image
+                    Select Images
                 </button>
                 <p class="text-sm text-gray-400 mt-4">Supports JPG, PNG, GIF, BMP, and more</p>
             </div>
@@ -90,21 +90,26 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
             <!-- Conversion Status & Loading State -->
             <div id="processing-state" class="hidden w-full p-4">
                 <div id="loading-spinner" class="animate-spin h-10 w-10 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p id="status-text" class="text-lg font-semibold text-purple-600">Processing image and generating SEO filename...</p>
+                <!-- Status text will dynamically update with the current file number -->
+                <p id="status-text" class="text-lg font-semibold text-purple-600">Processing files...</p>
             </div>
 
-            <!-- Result State -->
+            <!-- Result State - MODIFIED for list view -->
             <div id="result-state" class="hidden w-full p-4">
-                <img id="preview-image" src="" alt="Converted Image Preview" class="max-h-64 object-contain rounded-lg mx-auto mb-4 shadow-md max-w-full h-auto">
                 <p class="text-lg font-semibold text-green-600 mb-2">Conversion Complete!</p>
-                <p class="text-gray-600 mb-4">New SEO-Friendly Filename (AI Generated):</p>
-                <code id="new-filename-display" class="bg-gray-100 text-gray-800 p-2 rounded-lg font-mono text-sm inline-block mb-6 break-all"></code>
-
+                <p class="text-gray-600 mb-4">Successfully converted <span id="count-display" class="font-bold text-purple-600">0</span> images:</p>
+                
+                <!-- Container for the list of converted files -->
+                <div id="results-list" class="space-y-4 max-h-80 overflow-y-auto p-4 bg-gray-50 border border-gray-200 rounded-lg mb-6 text-left">
+                    <!-- Results rendered here by JS -->
+                </div>
+                
+                <!-- Download button updated to download all -->
                 <button id="download-btn" class="purple-gradient-btn text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-300">
-                    Download WebP
+                    Download All (.webp)
                 </button>
                 <button id="reset-btn" class="text-gray-600 bg-white border border-gray-300 font-bold py-3 px-8 rounded-full ml-4 hover:bg-gray-50 focus:outline-none">
-                    Convert Another
+                    Convert Another Batch
                 </button>
             </div>
 
@@ -143,11 +148,13 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
     const processingState = document.getElementById('processing-state');
     const resultState = document.getElementById('result-state');
     const statusText = document.getElementById('status-text');
-    const newFilenameDisplay = document.getElementById('new-filename-display');
-    const previewImage = document.getElementById('preview-image');
+    
+    // NEW DOM elements for batch processing
+    const resultsList = document.getElementById('results-list');
+    const countDisplay = document.getElementById('count-display');
 
-    let convertedBlob = null;
-    let newFilename = 'converted-image.webp';
+    // Replaced single file state with an array of results
+    let conversionResults = []; // [{ blob: Blob, filename: string, originalName: string }]
 
 
     // --- Utility Functions ---
@@ -272,73 +279,107 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
         return 'converted-image-fallback.webp';
     }
 
+    /**
+     * Renders the list of converted results in the UI.
+     */
+    function renderResults() {
+        resultsList.innerHTML = '';
+        countDisplay.textContent = conversionResults.length;
+
+        conversionResults.forEach((result) => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0';
+            
+            // Create a temporary Object URL for the blob to be downloadable via anchor tag
+            const downloadUrl = URL.createObjectURL(result.blob);
+
+            item.innerHTML = `
+                <div class="text-left overflow-hidden">
+                    <p class="text-sm text-gray-400 truncate">Original: ${result.originalName}</p>
+                    <code class="text-sm font-mono text-gray-800 break-all">${result.filename}</code>
+                </div>
+                <a href="${downloadUrl}" download="${result.filename}" 
+                   class="text-purple-600 hover:text-purple-800 font-semibold text-sm flex-shrink-0 ml-4">
+                    Download
+                </a>
+            `;
+            resultsList.appendChild(item);
+
+            // Clean up the temporary URL after the download link is created (optional, but good practice)
+            // Note: The URLs created here need to persist until the user decides to download, 
+            // but the element is removed on reset, so no need for immediate cleanup.
+        });
+    }
+
 
     /**
-     * Converts a File object to a WebP Blob and generates an SEO filename.
-     * @param {File} file - The image file to process.
+     * Converts a list of File objects to WebP Blobs and generates SEO filenames.
+     * @param {Array<File>} filesArray - The image files to process.
      */
-    async function processFile(file) {
+    async function processFiles(filesArray) {
         // 1. Setup UI for processing
         initialState.classList.add('hidden');
         resultState.classList.add('hidden');
         processingState.classList.remove('hidden');
-        statusText.textContent = '1/3: Loading image data...';
 
-        try {
-            const img = new Image();
-            const url = URL.createObjectURL(file);
+        conversionResults = []; // Clear previous results
+        const totalFiles = filesArray.length;
 
-            // Wait for image to load
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = () => reject(new Error("Image failed to load. The file might be corrupted or unsupported."));
-                img.src = url;
-            });
-
-            // 2. Convert to WebP (Client-Side)
-            statusText.textContent = '2/3: Converting image to WebP format...';
+        for (let i = 0; i < totalFiles; i++) {
+            const file = filesArray[i];
+            statusText.textContent = `Processing image ${i + 1} of ${totalFiles}: ${file.name}`;
             
-            // Set canvas size to image size
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            
-            // Draw the image onto the canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+            try {
+                // 1. Load Image
+                const img = new Image();
+                const url = URL.createObjectURL(file);
 
-            // Get the WebP blob from the canvas (quality 0.92 is a good default for balance)
-            convertedBlob = await new Promise(resolve => {
-                // Use a standard canvas for maximum compatibility in this environment
-                canvas.toBlob(resolve, 'image/webp', 0.92);
-            });
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error(`Failed to load: ${file.name}`));
+                    img.src = url;
+                });
+                URL.revokeObjectURL(url); // Clean up load URL immediately
 
-            if (!convertedBlob) {
-                throw new Error("Failed to convert image to WebP blob. Check browser support for toBlob('image/webp').");
+                // 2. Convert to WebP Blob (using canvas)
+                statusText.textContent = `Converting image ${i + 1} of ${totalFiles} to WebP...`;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+
+                const convertedBlob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/webp', 0.92);
+                });
+
+                if (!convertedBlob) {
+                    throw new Error(`Failed to convert ${file.name} to WebP.`);
+                }
+
+                // 3. Generate SEO Filename
+                statusText.textContent = `Generating AI filename for ${file.name}...`;
+                const base64Image = await blobToBase64(file);
+                const seoFilename = await generateSeoFilename(base64Image, file.type);
+                
+                conversionResults.push({
+                    blob: convertedBlob,
+                    filename: seoFilename,
+                    originalName: file.name
+                });
+
+            } catch (error) {
+                console.error(`Skipping file ${file.name} due to error:`, error.message);
+                // Continue to the next file if one fails
             }
+        }
 
-            // Set the preview image URL from the blob (for display)
-            previewImage.src = URL.createObjectURL(convertedBlob);
-            
-            // 3. Generate SEO Filename (AI-Powered)
-            statusText.textContent = '3/3: Generating AI-powered SEO filename...';
-
-            // Get the base64 of the original file for multimodal analysis
-            const base64Image = await blobToBase64(file);
-            newFilename = await generateSeoFilename(base64Image, file.type);
-            
-            newFilenameDisplay.textContent = newFilename;
-
-            // 4. Update UI for Result
+        // 4. Update UI for Result
+        if (conversionResults.length > 0) {
+            renderResults();
             processingState.classList.add('hidden');
             resultState.classList.remove('hidden');
-
-            // Clean up the object URL
-            URL.revokeObjectURL(url);
-
-        } catch (error) {
-            console.error('Conversion failed:', error);
-            // Show a custom message box instead of alert()
-            showError(`Conversion Error: ${error.message}`);
+        } else {
+            showError("Conversion failed for all selected files, or no valid images were found.");
             resetApp();
         }
     }
@@ -347,10 +388,13 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
     // --- Event Handlers & Initialization ---
 
     function handleFileSelection(files) {
-        if (files && files.length > 0 && files[0].type.startsWith('image/')) {
-            processFile(files[0]);
+        // Filter the FileList for images and convert to a true Array
+        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+        
+        if (imageFiles.length > 0) {
+            processFiles(imageFiles); 
         } else if (files && files.length > 0) {
-            showError("Invalid file type. Please select a supported image file (JPG, PNG, GIF, BMP).");
+            showError("Invalid file type. Please select supported image file(s) (JPG, PNG, GIF, BMP).");
         }
     }
 
@@ -360,7 +404,7 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
         errorDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         errorDiv.innerHTML = `
             <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm mx-4 text-center">
-                <p class="text-xl font-bold text-red-600 mb-4">Conversion Failed</p>
+                <p class="text-xl font-bold text-red-600 mb-4">Operation Failed</p>
                 <p class="text-gray-700 mb-6">${message}</p>
                 <button id="close-error-btn" class="purple-gradient-btn text-white font-bold py-2 px-6 rounded-full">
                     Close
@@ -399,30 +443,36 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
     selectImageBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => handleFileSelection(e.target.files));
 
-    // Download Listener
+    // Download Listener - Updated to trigger sequential downloads for all files
     downloadBtn.addEventListener('click', () => {
-        if (convertedBlob && newFilename) {
-            // Create a temporary link element
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(convertedBlob);
-            a.download = newFilename; // Use the AI-generated filename
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            // Clean up the object URL after triggering download
-            URL.revokeObjectURL(a.href);
-        } else {
-            showError("No converted image found for download.");
+        if (conversionResults.length === 0) {
+            showError("No converted images available for download.");
+            return;
         }
+
+        // Trigger sequential downloads for each result
+        conversionResults.forEach((result, index) => {
+            // Use a slight delay between downloads to prevent browser blocking/warnings
+            setTimeout(() => {
+                const a = document.createElement('a');
+                const downloadUrl = URL.createObjectURL(result.blob);
+                a.href = downloadUrl;
+                a.download = result.filename; 
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                // It's safe to revoke the URL immediately after the click has been registered
+                URL.revokeObjectURL(downloadUrl);
+            }, index * 200); // 200ms delay per file
+        });
     });
 
     // Reset Listener
     function resetApp() {
         // Clear previous data
-        convertedBlob = null;
-        newFilename = 'converted-image.webp';
+        conversionResults = [];
         fileInput.value = ''; // Reset file input
-        previewImage.src = '';
+        resultsList.innerHTML = ''; // Clear the list UI
 
         // Reset UI state
         processingState.classList.add('hidden');
