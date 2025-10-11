@@ -1,382 +1,439 @@
+<!--
+WebP Converter with AI-Powered SEO Filenames
+This application converts various image formats (PNG, JPG, etc.) to WebP format
+and uses the Gemini API to generate an SEO-friendly filename based on the image content.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Chart Analyzer</title>
+    <title>WebP Converter</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Custom styles for the purple gradient background and Inter font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start; /* Align to the top */
+            background: linear-gradient(135deg, #f0f4f8 0%, #e0e8f0 100%);
             min-height: 100vh;
-            padding: 2rem;
-            box-sizing: border-box;
-        }
-        .container {
-            max-width: 900px;
-            width: 100%;
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-            box-sizing: border-box;
-        }
-        .file-input-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-            width: 100%;
-        }
-        .file-input-wrapper input[type=file] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        .file-input-button {
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #4f46e5;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
-            font-weight: 600;
-            border: none;
-            width: 100%;
-            text-align: center;
         }
-        .file-input-button:hover {
-            background-color: #4338ca;
+        /* Style for the dashed drop zone border and purple accent */
+        .drop-zone {
+            border: 2px dashed #9333ea; /* Purple color */
+            transition: all 0.3s ease;
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4f46e5;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            display: none; /* Hidden by default */
-            margin: 0 auto;
+        .drop-zone.dragover {
+            background-color: #f3e8ff; /* Light purple background on drag over */
+            border-color: #7e22ce;
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        /* Custom purple gradient for the button */
+        .purple-gradient-btn {
+            background-image: linear-gradient(to right, #9333ea 0%, #7e22ce 100%);
+            transition: all 0.3s ease;
+        }
+        .purple-gradient-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        /* Hide the hidden canvas but keep it in the DOM for conversion */
+        #conversion-canvas {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 antialiased">
-    <div class="container space-y-8">
-        <h1 class="text-4xl font-bold text-center text-indigo-700 mb-6">Stock Chart Analyzer</h1>
+<body class="p-4">
 
-        <div class="flex flex-col gap-8">
-            <!-- Image Input Section -->
-            <div class="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Provide Chart Image</h2>
-                
-                <div class="mb-4">
-                    <label for="entryPrice" class="block text-gray-700 text-sm font-bold mb-2">
-                        Entry Price (Optional):
-                    </label>
-                    <input type="number" id="entryPrice" placeholder="e.g., 150.75" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-indigo-500">
-                </div>
+    <div id="app" class="w-full max-w-2xl mx-auto text-center p-6 sm:p-10 bg-white shadow-2xl rounded-xl">
 
-                <div class="mb-4">
-                    <label for="imageUrl" class="block text-gray-700 text-sm font-bold mb-2">
-                        Image URL:
-                    </label>
-                    <input type="text" id="imageUrl" placeholder="e.g., https://s3.tradingview.com/snapshots/k/kViaEhps.png" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-indigo-500">
-                </div>
-
-                <button id="loadImageBtn" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 mb-4">
-                    Load Image from URL
-                </button>
-                
-                <div class="mb-4 text-sm text-gray-500">
-                    Supported formats: PNG, JPEG, WEBP. Max size: 7MB.
-                </div>
-                <div id="imagePreviewContainer" class="mt-4 border border-gray-300 rounded-md p-2 flex justify-center items-center bg-gray-50 min-h-[200px] overflow-hidden">
-                    <img id="chartPreview" src="https://placehold.co/400x300/e0e0e0/555555?text=Chart+Preview" alt="Chart Preview" class="max-w-full h-auto rounded-md object-contain">
-                </div>
-                <button id="analyzeBtn" class="mt-6 w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                    Analyze Chart
-                </button>
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="mx-auto w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                <!-- Icon: Gallery/Image Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 18m-4-10h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
             </div>
-
-            <!-- Analysis Result Section -->
-            <div class="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Analysis Result</h2>
-                <div id="loadingIndicator" class="loader my-8"></div>
-                <div id="analysisResult" class="bg-gray-50 p-4 rounded-md border border-gray-200 text-gray-700 leading-relaxed">
-                    <p class="text-gray-500">Upload a stock chart or provide its URL and click "Analyze Chart" to get insights from an AI swing trader.</p>
-                </div>
-                 <!-- Custom Message Box -->
-                <div id="messageBox" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
-                        <h3 id="messageBoxTitle" class="text-lg font-bold mb-2 text-gray-900"></h3>
-                        <p id="messageBoxContent" class="text-gray-700 mb-4"></p>
-                        <button id="messageBoxCloseBtn" class="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Close</button>
-                    </div>
-                </div>
-            </div>
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">WebP Converter</h1>
+            <p class="text-gray-500">Transform your images to WebP format instantly with AI-powered SEO filenames.</p>
         </div>
+
+        <!-- Conversion Area / Drop Zone -->
+        <div id="drop-zone" class="drop-zone p-8 rounded-xl bg-white shadow-lg flex flex-col items-center justify-center transition-shadow">
+
+            <!-- Hidden file input for selection -->
+            <input type="file" id="file-input" accept="image/*" class="hidden">
+
+            <!-- Initial State -->
+            <div id="initial-state" class="w-full">
+                <div class="mx-auto w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mb-4">
+                    <!-- Upload Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                </div>
+                <p class="text-lg font-semibold text-gray-700 mb-2">Drop your image here</p>
+                <p class="text-gray-500 mb-6">or click to browse from your device</p>
+
+                <button id="select-image-btn" class="purple-gradient-btn text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-300">
+                    Select Image
+                </button>
+                <p class="text-sm text-gray-400 mt-4">Supports JPG, PNG, GIF, BMP, and more</p>
+            </div>
+
+            <!-- Conversion Status & Loading State -->
+            <div id="processing-state" class="hidden w-full p-4">
+                <div id="loading-spinner" class="animate-spin h-10 w-10 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p id="status-text" class="text-lg font-semibold text-purple-600">Processing image and generating SEO filename...</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="result-state" class="hidden w-full p-4">
+                <img id="preview-image" src="" alt="Converted Image Preview" class="max-h-64 object-contain rounded-lg mx-auto mb-4 shadow-md max-w-full h-auto">
+                <p class="text-lg font-semibold text-green-600 mb-2">Conversion Complete!</p>
+                <p class="text-gray-600 mb-4">New SEO-Friendly Filename (AI Generated):</p>
+                <code id="new-filename-display" class="bg-gray-100 text-gray-800 p-2 rounded-lg font-mono text-sm inline-block mb-6 break-all"></code>
+
+                <button id="download-btn" class="purple-gradient-btn text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-300">
+                    Download WebP
+                </button>
+                <button id="reset-btn" class="text-gray-600 bg-white border border-gray-300 font-bold py-3 px-8 rounded-full ml-4 hover:bg-gray-50 focus:outline-none">
+                    Convert Another
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Footer Note -->
+        <p class="text-xs text-gray-400 mt-6">
+            All processing happens in your browser. Your images never leave your device.
+        </p>
+        <p class="text-xs text-gray-400 mt-2">
+            AI renaming uses the Gemini API.
+        </p>
+
     </div>
 
-    <script>
-        const imageUrlInput = document.getElementById('imageUrl');
-        const loadImageBtn = document.getElementById('loadImageBtn');
-        const chartPreview = document.getElementById('chartPreview');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const analysisResult = document.getElementById('analysisResult');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const messageBox = document.getElementById('messageBox');
-        const messageBoxTitle = document.getElementById('messageBoxTitle');
-        const messageBoxContent = document.getElementById('messageBoxContent');
-        const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
-        const entryPriceInput = document.getElementById('entryPrice');
-
-        let base64Image = ''; // To store the base64 string of the uploaded image
-        let imageMimeType = ''; // To store the MIME type of the loaded image
-
-        // Function to show custom message box
-        function showMessageBox(title, message) {
-            messageBoxTitle.textContent = title;
-            messageBoxContent.textContent = message;
-            messageBox.classList.remove('hidden');
-        }
-
-        // Close button for message box
-        messageBoxCloseBtn.addEventListener('click', () => {
-            messageBox.classList.add('hidden');
-        });
-
-        // Function to format the raw text response into HTML
-        function formatAnalysisResult(rawText) {
-            let htmlContent = '';
-            
-            const lines = rawText.split('\n');
-            let inUnorderedList = false;
-            let inOrderedList = false;
-
-            lines.forEach(line => {
-                let trimmedLine = line.trim();
-
-                // Convert bold markdown to HTML strong tags
-                trimmedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                // Convert italics markdown to HTML em tags
-                trimmedLine = trimmedLine.replace(/\*(.*?)\*/g, '<em>$1</em>');
-                trimmedLine = trimmedLine.replace(/_(.*?)_/g, '<em>$1</em>');
+    <!-- Hidden Canvas for client-side image processing (REQUIRED for toBlob/WebP conversion) -->
+    <canvas id="conversion-canvas"></canvas>
 
 
-                if (trimmedLine.startsWith('### ')) {
-                    // Close any open lists before a heading
-                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
-                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
-                    htmlContent += `<h3 class="text-xl font-semibold mt-4 mb-2 text-indigo-800">${trimmedLine.substring(4).trim()}</h3>`;
-                } else if (trimmedLine.match(/^\d+\.\s/)) { // Ordered list item (e.g., "1. ")
-                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
-                    if (!inOrderedList) { htmlContent += '<ol class="list-decimal list-inside ml-4 mb-2">'; inOrderedList = true; }
-                    htmlContent += `<li class="mb-1">${trimmedLine}</li>`;
-                } else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ')) { // Unordered list item
-                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
-                    if (!inUnorderedList) { htmlContent += '<ul class="list-disc list-inside ml-4 mb-2">'; inUnorderedList = true; }
-                    htmlContent += `<li class="mb-1">${trimmedLine.substring(2).trim()}</li>`;
-                } else if (trimmedLine === '') {
-                    // Close lists if there's an empty line after them
-                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
-                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
-                    htmlContent += '<p class="mb-2">&nbsp;</p>'; // Add a non-breaking space for line breaks
-                } else {
-                    // Close any open lists before a regular paragraph
-                    if (inUnorderedList) { htmlContent += '</ul>'; inUnorderedList = false; }
-                    if (inOrderedList) { htmlContent += '</ol>'; inOrderedList = false; }
-                    htmlContent += `<p class="mb-2">${trimmedLine}</p>`;
-                }
-            });
+<script type="module">
+    // Global API key for Gemini models (provided by environment)
+    const apiKey = "AIzaSyChsJtQKCt8pJUCTjIe_-e0t777uWzXY7A"; 
+    // API endpoint for multimodal generation (image understanding + text output)
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-            // Close any remaining open lists at the end
-            if (inUnorderedList) { htmlContent += '</ul>'; }
-            if (inOrderedList) { htmlContent += '</ol>'; }
+    // --- DOM Elements ---
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const selectImageBtn = document.getElementById('select-image-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const canvas = document.getElementById('conversion-canvas');
+    const ctx = canvas.getContext('2d');
 
-            // Add emojis based on keywords (simple example)
-            htmlContent = htmlContent.replace(/uptrend/g, 'uptrend 📈');
-            htmlContent = htmlContent.replace(/downtrend/g, 'downtrend 📉');
-            htmlContent = htmlContent.replace(/strong/g, 'strong 💪'); // Applies to "momentum is strong" or other strong instances
-            htmlContent = htmlContent.replace(/Golden Cross/g, 'Golden Cross ✨');
-            htmlContent = htmlContent.replace(/decision/g, 'decision 💡');
-            htmlContent = htmlContent.replace(/support/g, 'support 🛡️');
-            htmlContent = htmlContent.replace(/resistance/g, 'resistance 🧱');
-            htmlContent = htmlContent.replace(/buy/g, 'buy 🟢');
-            htmlContent = htmlContent.replace(/sell/g, 'sell 🔴');
-            htmlContent = htmlContent.replace(/Profit/g, 'Profit 💰');
-            htmlContent = htmlContent.replace(/Loss/g, 'Loss 💸');
-            htmlContent = htmlContent.replace(/risk/g, 'risk ⚠️');
+    const initialState = document.getElementById('initial-state');
+    const processingState = document.getElementById('processing-state');
+    const resultState = document.getElementById('result-state');
+    const statusText = document.getElementById('status-text');
+    const newFilenameDisplay = document.getElementById('new-filename-display');
+    const previewImage = document.getElementById('preview-image');
+
+    let convertedBlob = null;
+    let newFilename = 'converted-image.webp';
 
 
-            return htmlContent;
-        }
+    // --- Utility Functions ---
 
-        // Function to load image from URL and convert to Base64
-        loadImageBtn.addEventListener('click', async () => {
-            const imageUrl = imageUrlInput.value.trim();
-            if (!imageUrl) {
-                showMessageBox('No URL Provided', 'Please enter an image URL.');
-                return;
-            }
-
-            // Clear previous preview and base64 data
-            chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Loading...";
-            base64Image = '';
-            imageMimeType = '';
-            
-            try {
-                const response = await fetch(imageUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to load image from URL: ${response.statusText}`);
-                }
-
-                const blob = await response.blob();
-                imageMimeType = blob.type; // Get actual MIME type
-
-                // Check if the MIME type is a supported image format
-                if (!['image/png', 'image/jpeg', 'image/webp'].includes(imageMimeType)) {
-                    showMessageBox('Unsupported Image Type', `The URL provided is not a supported image type (${imageMimeType}). Please use PNG, JPEG, or WEBP.`);
-                    chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Error+Loading";
-                    return;
-                }
-
-                // Check file size (max 7MB for Gemini API)
-                if (blob.size > 7 * 1024 * 1024) {
-                    showMessageBox('Image Too Large', 'The image from the URL is larger than 7MB. Please use a smaller image.');
-                    chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Too+Large";
-                    return;
-                }
-
-                const reader = new FileReader();
-                reader.onloadend = function() {
-                    chartPreview.src = URL.createObjectURL(blob); // Use blob URL for preview for better performance
-                    base64Image = reader.result.split(',')[1]; // Get only the base64 part
-                };
-                reader.readAsDataURL(blob);
-
-            } catch (error) {
-                showMessageBox('Image Load Error', `Could not load image: ${error.message}. Please check the URL.`);
-                console.error("Image loading error:", error);
-                chartPreview.src = "https://placehold.co/400x300/e0e0e0/555555?text=Error+Loading";
-            }
-        });
-
-
-        analyzeBtn.addEventListener('click', async () => {
-            if (!base64Image) {
-                showMessageBox('No Image Loaded', 'Please load a stock chart image from a URL before analyzing.');
-                return;
-            }
-
-            analysisResult.innerHTML = ''; // Clear previous results
-            loadingIndicator.style.display = 'block'; // Show loader
-
-            const entryPrice = entryPriceInput.value;
-            let prompt = `একজন অত্যন্ত দক্ষ সুইং ট্রেডার হিসেবে, এই দিনের চার্টটি আপনার কাছে কী অর্থ বহন করে এবং আপনি কী পদক্ষেপ নেবেন তা বিশ্লেষণ করুন। `;
-
-            if (entryPrice && !isNaN(parseFloat(entryPrice))) {
-                prompt += `যদি ট্রেডারটি **${parseFloat(entryPrice).toFixed(2)}** এন্ট্রি প্রাইসে ট্রেডে থেকে থাকেন, তাহলে তার কী করা উচিত সেই বিষয়েও সুনির্দিষ্ট পরামর্শ দিন, যার মধ্যে Take Profit এবং Stop Loss লেভেল অন্তর্ভুক্ত থাকবে। `;
-            }
-
-            prompt += `আপনার প্রতিক্রিয়া স্পষ্টভাবে মার্কডাউন ব্যবহার করে বাংলায় লিখুন (যেমন: হেডিং, বুলেট পয়েন্ট, বোল্ড টেক্সট)। তবে 'MA', 'RSI', 'Support', 'Resistance', 'Candlestick', 'Volume', 'Breakout', 'Retest', 'Golden Cross', 'Death Cross', 'Uptrend', 'Downtrend', 'Consolidation', 'Stop Loss', 'Take Profit', 'Entry', 'Exit' এর মতো ট্রেডিং শব্দগুলো ইংরেজিতেই রাখুন। MA 10 বেগুনি, MA 20 সবুজ, MA 50 কালো, MA 200 হলুদ। এটি একজন নতুন ট্রেডারকে সিদ্ধান্ত নিতে সাহায্য করার জন্য সংক্ষিপ্ত এবং সুস্পষ্ট হওয়া উচিত।`;
-
-
-            let chatHistory = [];
-            chatHistory.push({
-                role: "user",
-                parts: [{
-                    text: prompt
-                }, {
-                    inlineData: {
-                        mimeType: imageMimeType || "image/png", // Use detected MIME type, fallback to png
-                        data: base64Image
-                    }
-                }]
-            });
-
-            const payload = {
-                contents: chatHistory
+    /**
+     * Converts a File object or Blob into a Base64 string for API submission.
+     * @param {Blob | File} blob - The image blob/file.
+     * @returns {Promise<string>} Base64 data string.
+     */
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                // Remove the data URL prefix (e.g., "data:image/png;base64,")
+                const base64Data = reader.result.split(',')[1];
+                resolve(base64Data);
             };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
 
-            // IMPORTANT: For production deployments on GitHub Pages,
-            // NEVER expose your API key directly in client-side code.
-            // Use a secure backend to proxy your API calls.
-            // For local testing/personal use, you can replace "YOUR_GEMINI_API_KEY"
-            // with your actual Gemini API Key from Google AI Studio.
-            const apiKey = "AIzaSyChsJtQKCt8pJUCTjIe_-e0t777uWzXY7A"; // <<-- REPLACE THIS WITH YOUR ACTUAL API KEY FOR TESTING
-            // For Canvas environment, this variable is automatically populated.
-            // If running on GitHub Pages, you MUST provide your key here or use a backend.
-
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-            let retryCount = 0;
-            const maxRetries = 5;
-            const initialDelay = 1000; // 1 second
-
-            while (retryCount < maxRetries) {
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        if (response.status === 429) { // Too Many Requests
-                            const delay = initialDelay * Math.pow(2, retryCount);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            retryCount++;
-                            continue; // Retry the request
-                        } else {
-                            throw new Error(`API error: ${response.status} ${response.statusText}`);
-                        }
-                    }
-
-                    const result = await response.json();
-
-                    if (result.candidates && result.candidates.length > 0 &&
-                        result.candidates[0].content && result.candidates[0].content.parts &&
-                        result.candidates[0].content.parts.length > 0) {
-                        let rawText = result.candidates[0].content.parts[0].text;
-                        // Format the raw text with HTML tags and emojis
-                        analysisResult.innerHTML = formatAnalysisResult(rawText);
-                    } else {
-                        analysisResult.innerHTML = `<p class="text-red-600">AI থেকে কোনো সঠিক বিশ্লেষণ পাওয়া যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা অন্য একটি ছবি ব্যবহার করুন।</p>`;
-                        console.error("Unexpected API response structure:", result);
-                    }
-                    break; // Exit loop on success
-                } catch (error) {
-                    analysisResult.innerHTML = `<p class="text-red-600">চার্ট বিশ্লেষণ করতে ত্রুটি: ${error.message}</p>`;
-                    console.error("Error during API call:", error);
-                    break; // Exit loop on unrecoverable error
-                } finally {
-                    loadingIndicator.style.display = 'none'; // Hide loader
+    /**
+     * Exponential Backoff Retry mechanism for fetch.
+     * @param {Function} apiCall - The function that returns the fetch Promise.
+     * @param {number} maxRetries - Maximum number of retries.
+     * @returns {Promise<Response>} The final successful Response object.
+     */
+    async function fetchWithRetry(apiCall, maxRetries = 5) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await apiCall();
+                if (response.ok) {
+                    return response;
+                }
+                // Handle rate limiting or server errors, only retry on 429 or 5xx
+                if (response.status === 429 || response.status >= 500) {
+                    console.warn(`Attempt ${attempt} failed with status ${response.status}. Retrying...`);
+                } else {
+                    // Non-retryable error
+                    throw new Error(`API call failed with status ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error(`Attempt ${attempt} failed with network error:`, error);
+                // Non-retryable error if not a network issue
+                if (attempt === maxRetries) {
+                     throw error;
                 }
             }
 
-            if (retryCount === maxRetries) {
-                analysisResult.innerHTML = `<p class="text-red-600">কয়েকবার চেষ্টার পরও চার্ট বিশ্লেষণ করা সম্ভব হয়নি। অনুগ্রহ করে আপনার নেটওয়ার্ক সংযোগ পরীক্ষা করুন অথবা পরে আবার চেষ্টা করুন।</p>`;
+            // Exponential backoff wait: 2^attempt * 200ms
+            const delay = Math.pow(2, attempt) * 200;
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        throw new Error('API call failed after maximum retries.');
+    }
+
+
+    // --- Core Logic ---
+
+    /**
+     * Calls Gemini API to generate an SEO-friendly filename.
+     * @param {string} base64Image - Base64 data of the image.
+     * @param {string} mimeType - MIME type of the image.
+     * @returns {Promise<string>} SEO-friendly filename (e.g., "beautiful-sunset.webp").
+     */
+    async function generateSeoFilename(base64Image, mimeType) {
+        // System prompt is highly specific to ensure clean output
+        const systemPrompt = "You are a specialist in search engine optimization. Your task is to analyze the image and generate the best filename for it. The filename must be: 1. All lowercase. 2. Hyphen-separated. 3. Concise (2 to 5 descriptive words). 4. Must end with the file extension '.webp'. Output ONLY the filename, nothing else.";
+        const userQuery = "Generate the SEO filename for this image.";
+
+        const payload = {
+            contents: [
+                {
+                    role: "user",
+                    parts: [
+                        { text: userQuery },
+                        {
+                            inlineData: {
+                                mimeType: mimeType,
+                                data: base64Image
+                            }
+                        }
+                    ]
+                }
+            ],
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
             }
+        };
+
+        const apiCall = () => fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
-        console.log("Stock Chart Analyzer script loaded successfully.");
-    </script>
+
+        try {
+            const response = await fetchWithRetry(apiCall);
+            const result = await response.json();
+            
+            const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (generatedText) {
+                // Clean and normalize the output from the model
+                let cleanedName = generatedText.trim().toLowerCase();
+                // Remove any surrounding quotes or backticks if the model added them
+                cleanedName = cleanedName.replace(/^['"`]|['"`]$/g, '');
+                // Replace any non-alphanumeric/non-dot characters (excluding hyphens) with hyphens
+                cleanedName = cleanedName.replace(/[^a-z0-9.]+/g, '-');
+                // Ensure it ends with .webp, remove it first if it exists, then append
+                cleanedName = cleanedName.replace(/\.webp$/, '');
+                cleanedName = cleanedName.replace(/^-|-$/g, ' '); // Remove leading/trailing hyphens before cleaning up spaces
+                cleanedName = cleanedName.trim().replace(/\s+/g, '-');
+                
+                return cleanedName.length > 0 ? `${cleanedName}.webp` : 'ai-generated-image.webp';
+            }
+        } catch (error) {
+            console.error('Error generating filename with AI:', error);
+        }
+        // Fallback filename if AI fails
+        return 'converted-image-fallback.webp';
+    }
+
+
+    /**
+     * Converts a File object to a WebP Blob and generates an SEO filename.
+     * @param {File} file - The image file to process.
+     */
+    async function processFile(file) {
+        // 1. Setup UI for processing
+        initialState.classList.add('hidden');
+        resultState.classList.add('hidden');
+        processingState.classList.remove('hidden');
+        statusText.textContent = '1/3: Loading image data...';
+
+        try {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+
+            // Wait for image to load
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error("Image failed to load. The file might be corrupted or unsupported."));
+                img.src = url;
+            });
+
+            // 2. Convert to WebP (Client-Side)
+            statusText.textContent = '2/3: Converting image to WebP format...';
+            
+            // Set canvas size to image size
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            
+            // Draw the image onto the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            // Get the WebP blob from the canvas (quality 0.92 is a good default for balance)
+            convertedBlob = await new Promise(resolve => {
+                // Use a standard canvas for maximum compatibility in this environment
+                canvas.toBlob(resolve, 'image/webp', 0.92);
+            });
+
+            if (!convertedBlob) {
+                throw new Error("Failed to convert image to WebP blob. Check browser support for toBlob('image/webp').");
+            }
+
+            // Set the preview image URL from the blob (for display)
+            previewImage.src = URL.createObjectURL(convertedBlob);
+            
+            // 3. Generate SEO Filename (AI-Powered)
+            statusText.textContent = '3/3: Generating AI-powered SEO filename...';
+
+            // Get the base64 of the original file for multimodal analysis
+            const base64Image = await blobToBase64(file);
+            newFilename = await generateSeoFilename(base64Image, file.type);
+            
+            newFilenameDisplay.textContent = newFilename;
+
+            // 4. Update UI for Result
+            processingState.classList.add('hidden');
+            resultState.classList.remove('hidden');
+
+            // Clean up the object URL
+            URL.revokeObjectURL(url);
+
+        } catch (error) {
+            console.error('Conversion failed:', error);
+            // Show a custom message box instead of alert()
+            showError(`Conversion Error: ${error.message}`);
+            resetApp();
+        }
+    }
+
+
+    // --- Event Handlers & Initialization ---
+
+    function handleFileSelection(files) {
+        if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+            processFile(files[0]);
+        } else if (files && files.length > 0) {
+            showError("Invalid file type. Please select a supported image file (JPG, PNG, GIF, BMP).");
+        }
+    }
+
+    // Custom Error Message Box (since alert() is forbidden)
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        errorDiv.innerHTML = `
+            <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm mx-4 text-center">
+                <p class="text-xl font-bold text-red-600 mb-4">Conversion Failed</p>
+                <p class="text-gray-700 mb-6">${message}</p>
+                <button id="close-error-btn" class="purple-gradient-btn text-white font-bold py-2 px-6 rounded-full">
+                    Close
+                </button>
+            </div>
+        `;
+        document.body.appendChild(errorDiv);
+
+        document.getElementById('close-error-btn').onclick = () => {
+            document.body.removeChild(errorDiv);
+        };
+    }
+
+    // Drag and Drop Listeners
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        // Only allow dragover effect if not already processing
+        if (processingState.classList.contains('hidden')) {
+            dropZone.classList.add('dragover');
+        }
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (processingState.classList.contains('hidden')) { // Only process if not currently processing
+            handleFileSelection(e.dataTransfer.files);
+        }
+    });
+
+    // File Input and Button Listeners
+    selectImageBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => handleFileSelection(e.target.files));
+
+    // Download Listener
+    downloadBtn.addEventListener('click', () => {
+        if (convertedBlob && newFilename) {
+            // Create a temporary link element
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(convertedBlob);
+            a.download = newFilename; // Use the AI-generated filename
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            // Clean up the object URL after triggering download
+            URL.revokeObjectURL(a.href);
+        } else {
+            showError("No converted image found for download.");
+        }
+    });
+
+    // Reset Listener
+    function resetApp() {
+        // Clear previous data
+        convertedBlob = null;
+        newFilename = 'converted-image.webp';
+        fileInput.value = ''; // Reset file input
+        previewImage.src = '';
+
+        // Reset UI state
+        processingState.classList.add('hidden');
+        resultState.classList.add('hidden');
+        initialState.classList.remove('hidden');
+        dropZone.classList.remove('dragover');
+    }
+    resetBtn.addEventListener('click', resetApp);
+
+    // Initial setup
+    resetApp();
+</script>
 </body>
 </html>
