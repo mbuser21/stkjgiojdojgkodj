@@ -52,16 +52,22 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
 
     <div id="app" class="w-full max-w-2xl mx-auto text-center p-6 sm:p-10 bg-white shadow-2xl rounded-xl">
 
-        <!-- Header -->
-        <div class="mb-8">
+        <!-- Header with Settings Button -->
+        <div class="mb-8 relative">
+            <button id="open-settings-btn" class="absolute top-0 right-0 p-2 text-gray-400 hover:text-purple-600 transition-colors" title="API Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
             <div class="mx-auto w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
                 <!-- Icon: Gallery/Image Icon -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 18m-4-10h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
             </div>
-            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">WebP Converter (Batch Ready)</h1>
-            <p class="text-gray-500">Transform multiple images to WebP format instantly with AI-powered SEO filenames.</p>
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">WebP Converter</h1>
+            <p class="text-gray-500">Transform multiple images to WebP with AI-powered SEO filenames.</p>
         </div>
 
         <!-- Conversion Area / Drop Zone -->
@@ -125,16 +131,48 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
 
     </div>
 
-    <!-- Hidden Canvas for client-side image processing (REQUIRED for toBlob/WebP conversion) -->
+    <!-- Hidden Canvas -->
     <canvas id="conversion-canvas"></canvas>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all scale-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">API Settings</h3>
+                <button id="close-settings-x" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="text-gray-600 mb-4 text-sm">
+                Enter your Google Gemini API Key. The key is stored securely in your browser's local storage and is never sent to our servers.
+            </p>
+
+            <div class="mb-6">
+                <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-2">Gemini API Key</label>
+                <input type="password" id="api-key-input" placeholder="AIzaSy..." 
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                >
+                <p class="text-xs text-gray-400 mt-2">
+                    Don't have one? <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-purple-600 hover:underline">Get an API key here</a>.
+                </p>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button id="cancel-settings-btn" class="px-6 py-2 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">
+                    Cancel
+                </button>
+                <button id="save-settings-btn" class="purple-gradient-btn text-white font-bold py-2 px-6 rounded-lg shadow-md hover:shadow-lg">
+                    Save Key
+                </button>
+            </div>
+        </div>
+    </div>
 
 
 <script type="module">
-    // Global API key for Gemini models (provided by environment)
-    const apiKey = "AIzaSyABfZr17RkvWPbxTBEKkvsV4fALBIHQe1A"; 
-    // API endpoint for multimodal generation (image understanding + text output)
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
     // --- DOM Elements ---
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
@@ -143,6 +181,14 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
     const resetBtn = document.getElementById('reset-btn');
     const canvas = document.getElementById('conversion-canvas');
     const ctx = canvas.getContext('2d');
+    
+    // Settings Elements
+    const settingsModal = document.getElementById('settings-modal');
+    const openSettingsBtn = document.getElementById('open-settings-btn');
+    const closeSettingsX = document.getElementById('close-settings-x');
+    const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const apiKeyInput = document.getElementById('api-key-input');
 
     const initialState = document.getElementById('initial-state');
     const processingState = document.getElementById('processing-state');
@@ -158,6 +204,27 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
 
 
     // --- Utility Functions ---
+
+    function getApiKey() {
+        return localStorage.getItem('gemini_api_key');
+    }
+
+    function setApiKey(key) {
+        if (!key || key.trim() === '') {
+            localStorage.removeItem('gemini_api_key');
+            return;
+        }
+        localStorage.setItem('gemini_api_key', key.trim());
+    }
+
+    function toggleSettingsModal(show) {
+        if (show) {
+            settingsModal.classList.remove('hidden');
+            apiKeyInput.value = getApiKey() || '';
+        } else {
+            settingsModal.classList.add('hidden');
+        }
+    }
 
     /**
      * Converts a File object or Blob into a Base64 string for API submission.
@@ -222,6 +289,13 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
      * @returns {Promise<string>} SEO-friendly filename (e.g., "beautiful-sunset.webp").
      */
     async function generateSeoFilename(base64Image, mimeType) {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+            throw new Error("API Key is missing. Please check your settings.");
+        }
+        
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
         // System prompt is highly specific to ensure clean output
         const systemPrompt = "You are a specialist in search engine optimization. Your task is to analyze the image and generate the best filename for it. The filename must be: 1. All lowercase. 2. Hyphen-separated. 3. Concise (2 to 5 descriptive words). 4. Must end with the file extension '.webp'. Output ONLY the filename, nothing else.";
         const userQuery = "Generate the SEO filename for this image.";
@@ -481,6 +555,33 @@ and uses the Gemini API to generate an SEO-friendly filename based on the image 
         dropZone.classList.remove('dragover');
     }
     resetBtn.addEventListener('click', resetApp);
+
+    // Settings Logic
+    openSettingsBtn.addEventListener('click', () => toggleSettingsModal(true));
+    closeSettingsX.addEventListener('click', () => toggleSettingsModal(false));
+    cancelSettingsBtn.addEventListener('click', () => toggleSettingsModal(false));
+    
+    saveSettingsBtn.addEventListener('click', () => {
+        const key = apiKeyInput.value;
+        if (key.trim().length === 0) {
+            alert('Please enter a valid API key.');
+            return;
+        }
+        setApiKey(key);
+        toggleSettingsModal(false);
+        // Optionally reload or just let the user continue
+        // Check if we are in a "processing" blocked state? No, usually fine.
+    });
+
+    // Initial API Key Check
+    (function checkApiKey() {
+        const key = getApiKey();
+        if (!key) {
+            // Show modal immediately if no key
+            // Use setTimeout to ensure DOM is fully ready/rendered
+            setTimeout(() => toggleSettingsModal(true), 500);
+        }
+    })();
 
     // Initial setup
     resetApp();
